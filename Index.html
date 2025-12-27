@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Battle Royale Mini</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    overflow: hidden;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    background: radial-gradient(circle at center, #2a9d8f, #264653);
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+resize();
+window.addEventListener("resize", resize);
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+let player = {
+  x: canvas.width / 2,
+  y: canvas.height / 2,
+  r: 15,
+  hp: 100,
+  speed: 4
+};
+
+let bullets = [];
+let enemies = [];
+let stormRadius = Math.min(canvas.width, canvas.height) / 2;
+let stormShrink = 0.05;
+let angle = 0;
+
+function spawnEnemy() {
+  enemies.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: 12,
+    hp: 30
+  });
+}
+
+setInterval(spawnEnemy, 1500);
+
+let touchMove = null;
+let touchAim = null;
+
+canvas.addEventListener("touchstart", e => {
+  if (e.touches.length === 1) touchMove = e.touches[0];
+  if (e.touches.length === 2) touchAim = e.touches[1];
+});
+
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length >= 1) touchMove = e.touches[0];
+  if (e.touches.length >= 2) touchAim = e.touches[1];
+});
+
+canvas.addEventListener("touchend", () => {
+  touchMove = null;
+  touchAim = null;
+});
+
+canvas.addEventListener("click", shoot);
+
+function shoot() {
+  bullets.push({
+    x: player.x,
+    y: player.y,
+    dx: Math.cos(angle) * 8,
+    dy: Math.sin(angle) * 8
+  });
+}
+
+function update() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Movement
+  if (touchMove) {
+    let dx = touchMove.clientX - player.x;
+    let dy = touchMove.clientY - player.y;
+    let dist = Math.hypot(dx, dy);
+    if (dist > 5) {
+      player.x += dx / dist * player.speed;
+      player.y += dy / dist * player.speed;
+    }
+  }
+
+  if (touchAim) {
+    angle = Math.atan2(
+      touchAim.clientY - player.y,
+      touchAim.clientX - player.x
+    );
+  }
+
+  // Storm
+  stormRadius -= stormShrink;
+  let distFromCenter = Math.hypot(
+    player.x - canvas.width / 2,
+    player.y - canvas.height / 2
+  );
+  if (distFromCenter > stormRadius) player.hp -= 0.2;
+
+  // Bullets
+  bullets.forEach(b => {
+    b.x += b.dx;
+    b.y += b.dy;
+  });
+
+  // Enemies
+  enemies.forEach(e => {
+    let dx = player.x - e.x;
+    let dy = player.y - e.y;
+    let d = Math.hypot(dx, dy);
+    e.x += dx / d * 1.2;
+    e.y += dy / d * 1.2;
+  });
+
+  // Collisions
+  bullets.forEach((b, bi) => {
+    enemies.forEach((e, ei) => {
+      if (Math.hypot(b.x - e.x, b.y - e.y) < e.r) {
+        e.hp -= 20;
+        bullets.splice(bi, 1);
+        if (e.hp <= 0) enemies.splice(ei, 1);
+      }
+    });
+  });
+
+  // Draw storm
+  ctx.strokeStyle = "rgba(0,0,255,0.5)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(canvas.width / 2, canvas.height / 2, stormRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Draw player
+  ctx.fillStyle = "yellow";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw bullets
+  ctx.fillStyle = "white";
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw enemies
+  ctx.fillStyle = "red";
+  enemies.forEach(e => {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // HUD
+  ctx.fillStyle = "white";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("HP: " + Math.floor(player.hp), 20, 30);
+
+  if (player.hp <= 0) {
+    alert("Game Over");
+    location.reload();
+  }
+
+  requestAnimationFrame(update);
+}
+
+update();
+</script>
+</body>
+</html>
